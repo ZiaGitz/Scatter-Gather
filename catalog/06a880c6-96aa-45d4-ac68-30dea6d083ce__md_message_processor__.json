@@ -1,0 +1,11 @@
+{
+    "inputMessageMetadata": {},
+    "outputMessageMetadata": {
+        "messagePayload": {
+            "connectorName": "#_custom_mule_metadata_type_#",
+            "typeId": "SGSelectedFlight"
+        }
+    },
+    "id": "06a880c6-96aa-45d4-ac68-30dea6d083ce",
+    "version": "5.2.0.0"
+}

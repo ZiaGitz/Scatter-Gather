@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:vm="http://www.mulesoft.org/schema/mule/vm" xmlns:ws="http://www.mulesoft.org/schema/mule/ws" xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ws http://www.mulesoft.org/schema/mule/ws/current/mule-ws.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd">
+    <http:listener-config name="HTTP_Listener_Configuration" host="0.0.0.0" port="8081" doc:name="HTTP Listener Configuration"/>
+    <ws:consumer-config name="Web_Service_Consumer" wsdlLocation="http://ilt.mulesoft-training.com/essentials/delta?wsdl" service="TicketServiceService" port="TicketServicePort" serviceAddress="http://ilt.mulesoft-training.com/essentials/delta" doc:name="Web Service Consumer"/>
+    <http:request-config name="HTTP_Request_Configuration" host="ilt.mulesoft-training.com" port="80" doc:name="HTTP Request Configuration"/>
+    <vm:connector name="VM" validateConnections="true" doc:name="VM"/>
+    <vm:connector name="VM1" validateConnections="true" doc:name="VM"/>
+    <vm:connector name="VM2" validateConnections="true" doc:name="VM"/>
+    <flow name="zia_scatter_gatherFlow">
+        <http:listener config-ref="HTTP_Listener_Configuration" path="/sg" doc:name="HTTP"/>
+        <scatter-gather doc:name="Scatter-Gather">
+            <processor-chain>
+                <set-variable variableName="desVar" value="#[message.inboundProperties.'http.query.params'.destination]" doc:name="Variable"/>
+                <dw:transform-message doc:name="Transform Message">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/xml
+%namespace ns0 http://soap.training.mulesoft.com/
+---
+{
+	ns0#findFlight: {
+		destination: flowVars.desVar as :string
+	}
+}]]></dw:set-payload>
+                </dw:transform-message>
+                <ws:consumer config-ref="Web_Service_Consumer" operation="findFlight" doc:name="Web Service Consumer"/>
+                <dw:transform-message doc:name="Transform Message" metadata:id="06a880c6-96aa-45d4-ac68-30dea6d083ce">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+%namespace ns0 http://soap.training.mulesoft.com/
+---
+{
+	flights: payload.ns0#findFlightResponse.*return map ((return , indexOfReturn) -> {
+		code: return.code,
+		price: return.price,
+		origin: return.origin,
+		destination: return.destination,
+		departureDate: return.departureDate,
+		airlineName: return.airlineName,
+		planeType: return.planeType,
+		emptySeats: return.emptySeats
+	})
+}]]></dw:set-payload>
+                </dw:transform-message>
+                <logger message="web service consumer logger data-----&gt; #[payload]" level="INFO" doc:name="Logger"/>
+                <vm:outbound-endpoint exchange-pattern="one-way" path="vmWebServiceConsumer" connector-ref="VM1" doc:name="VM"/>
+            </processor-chain>
+            <processor-chain>
+                <set-variable variableName="desVar1" value="#[message.inboundProperties.'http.query.params'.destination]" doc:name="Variable"/>
+                <dw:transform-message doc:name="Transform Message" metadata:id="c549262c-1929-4b77-8f39-f2e676a83498">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/xml
+%namespace ns0 http://soap.training.mulesoft.com/
+---
+{
+	ns0#findFlight: {
+		destination: flowVars.desVar1 as :string
+	}
+}]]></dw:set-payload>
+                </dw:transform-message>
+                <http:request config-ref="HTTP_Request_Configuration" path="/essentials/united/flights/{d}" method="GET" doc:name="HTTP">
+                    <http:request-builder>
+                        <http:uri-param paramName="d" value="#[flowVars.desVar1]"/>
+                    </http:request-builder>
+                </http:request>
+                <dw:transform-message doc:name="Transform Message" metadata:id="0fcfd918-f390-4cd7-b9a4-3b5e23803a52">
+                    <dw:input-payload mimeType="application/json"/>
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+%namespace ns0 http://soap.training.mulesoft.com/
+---
+{
+	flights: payload.flights map ((flight , indexOfFlight) -> {
+		code: flight.code,
+		price: flight.price,
+		origin: flight.origin,
+		destination: flight.destination,
+		departureDate: flight.departureDate,
+		airlineName: flight.airlineName,
+		planeType: flight.planeType,
+		emptySeats: flight.emptySeats
+	})
+}]]></dw:set-payload>
+                </dw:transform-message>
+                <logger message="HTTP Request logger data-----&gt; #[payload]" level="INFO" doc:name="Logger"/>
+                <vm:outbound-endpoint exchange-pattern="one-way" path="HTTPrequestVM" connector-ref="VM2" doc:name="VM"/>
+            </processor-chain>
+        </scatter-gather>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+flatten payload]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="Merged Data-----&gt; #[payload]" level="INFO" doc:name="Logger"/>
+        <vm:outbound-endpoint exchange-pattern="one-way" path="vm" connector-ref="VM" doc:name="VM"/>
+    </flow>
+    <flow name="zia_scatter_gatherFlow1">
+        <vm:inbound-endpoint exchange-pattern="one-way" path="vm" connector-ref="VM" doc:name="VM"/>
+        <logger message="This is Flow2  Merged Data with VM-----&gt; #[payload]" level="INFO" doc:name="Logger"/>
+    </flow>
+    <flow name="zia_scatter_gatherFlow2">
+        <vm:inbound-endpoint exchange-pattern="one-way" path="vmWebServiceConsumer" connector-ref="VM1" doc:name="VM"/>
+        <logger message="WebServiceConsumer Logger Data with VM ---&gt; #[payload]" level="INFO" doc:name="Logger"/>
+    </flow>
+    <flow name="zia_scatter_gatherFlow3">
+        <vm:inbound-endpoint exchange-pattern="one-way" path="HTTPrequestVM" connector-ref="VM2" doc:name="VM"/>
+        <logger message="HTTP Request Logger Data with VM ---&gt;#[payload]" level="INFO" doc:name="Logger"/>
+    </flow>
+</mule>

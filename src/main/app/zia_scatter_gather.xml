@@ -114,6 +114,6 @@ flatten payload]]></dw:set-payload>
     </flow>
     <flow name="zia_scatter_gatherFlow3">
         <vm:inbound-endpoint exchange-pattern="one-way" path="HTTPrequestVM" connector-ref="VM2" doc:name="VM"/>
-        <logger message="HTTP Request Logger Data with VM ---&gt;#[payload]" level="INFO" doc:name="Logger"/>
+        <logger message="Checking GIT Purpose....HTTP Request Logger Data with VM ---&gt;#[payload]" level="INFO" doc:name="Logger"/>
     </flow>
 </mule>
